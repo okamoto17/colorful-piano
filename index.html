@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Colorful Piano</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none; /* iPadでのスクロール・拡大縮小操作を防止 */
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #121212;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 上部：音符表示エリア */
+        .notes-stage {
+            position: relative;
+            width: 100%;
+            height: 35vh;
+            background: #1a1a1a;
+            overflow: hidden;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 3px solid #2a2a2a;
+        }
+
+        /* 各音符要素 */
+        .note-item {
+            position: relative;
+            font-size: 6.0rem;
+            color: #333;
+            transition: color 0.1s ease, text-shadow 0.1s ease, transform 0.15s ease;
+            cursor: default;
+        }
+
+        /* 音符が光るクラス */
+        .note-item.active {
+            color: var(--glow-color) !important;
+            text-shadow: 0 0 20px var(--glow-color), 0 0 40px var(--glow-color), 0 0 60px var(--glow-color);
+            transform: scale(1.3) rotate(var(--rotation, 0deg)) translateY(-8px) !important;
+        }
+
+        /* 下部：鍵盤エリア */
+        .piano-container {
+            position: relative;
+            width: 100%;
+            height: 65vh;
+            background: #000;
+            display: flex;
+        }
+
+        /* 白鍵 (8枚) */
+        .key-white {
+            position: relative;
+            flex: 1;
+            background: linear-gradient(to bottom, #eeeeee 0%, #ffffff 100%);
+            border: 1px solid #bbb;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+            cursor: pointer;
+            z-index: 1;
+            box-shadow: inset 0 -12px 12px rgba(0,0,0,0.15);
+            transition: background 0.05s, box-shadow 0.05s;
+        }
+        .key-white:active, .key-white.pressed {
+            background: #d8d8d8;
+            box-shadow: inset 0 -4px 6px rgba(0,0,0,0.3);
+        }
+
+        /* 黒鍵 (5枚) */
+        .key-black {
+            position: absolute;
+            top: 0;
+            width: 7.2%;
+            height: 60%;
+            background: linear-gradient(to bottom, #333 0%, #111 100%);
+            border-bottom-left-radius: 6px;
+            border-bottom-right-radius: 6px;
+            cursor: pointer;
+            z-index: 2;
+            border: 1px solid #000;
+            box-shadow: inset 0 -6px 6px rgba(255,255,255,0.15), 0 6px 10px rgba(0,0,0,0.5);
+            transition: background 0.05s, box-shadow 0.05s;
+        }
+        .key-black:active, .key-black.pressed {
+            background: #222;
+            box-shadow: inset 0 -2px 3px rgba(255,255,255,0.2), 0 3px 5px rgba(0,0,0,0.5);
+        }
+
+        /* 黒鍵の位置調整 */
+        .key-black[data-note="C#3"] { left: 8.9%; }
+        .key-black[data-note="D#3"] { left: 21.4%; }
+        .key-black[data-note="F#3"] { left: 46.4%; }
+        .key-black[data-note="G#3"] { left: 58.9%; }
+        .key-black[data-note="A#3"] { left: 71.4%; }
+    </style>
+</head>
+<body>
+
+    <!-- 13個の音符が並ぶステージ -->
+    <div class="notes-stage" id="notesStage"></div>
+
+    <!-- 鍵盤エリア -->
+    <div class="piano-container" id="pianoContainer">
+        <!-- 白鍵 (8枚: C3〜C4) -->
+        <div class="key-white" data-note="C3"></div>
+        <div class="key-white" data-note="D3"></div>
+        <div class="key-white" data-note="E3"></div>
+        <div class="key-white" data-note="F3"></div>
+        <div class="key-white" data-note="G3"></div>
+        <div class="key-white" data-note="A3"></div>
+        <div class="key-white" data-note="B3"></div>
+        <div class="key-white" data-note="C4"></div>
+
+        <!-- 黒鍵 (5枚) -->
+        <div class="key-black" data-note="C#3"></div>
+        <div class="key-black" data-note="D#3"></div>
+        <div class="key-black" data-note="F#3"></div>
+        <div class="key-black" data-note="G#3"></div>
+        <div class="key-black" data-note="A#3"></div>
+    </div>
+
+    <script>
+        const notesInfo = [
+            { note: 'C3',  color: 'hsl(0, 100%, 60%)' },
+            { note: 'C#3', color: 'hsl(28, 100%, 55%)' },
+            { note: 'D3',  color: 'hsl(55, 100%, 50%)' },
+            { note: 'D#3', color: 'hsl(90, 80%, 50%)' },
+            { note: 'E3',  color: 'hsl(130, 75%, 45%)' },
+            { note: 'F3',  color: 'hsl(165, 85%, 45%)' },
+            { note: 'F#3', color: 'hsl(195, 90%, 50%)' },
+            { note: 'G3',  color: 'hsl(220, 90%, 60%)' },
+            { note: 'G#3', color: 'hsl(250, 80%, 65%)' },
+            { note: 'A3',  color: 'hsl(280, 85%, 65%)' },
+            { note: 'A#3', color: 'hsl(310, 85%, 60%)' },
+            { note: 'B3',  color: 'hsl(335, 90%, 60%)' },
+            { note: 'C4',  color: 'hsl(360, 100%, 60%)' }
+        ];
+
+        const soundUrls = {
+            'C3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/C3.mp3',
+            'C#3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/Db3.mp3',
+            'D3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/D3.mp3',
+            'D#3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/Eb3.mp3',
+            'E3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/E3.mp3',
+            'F3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/F3.mp3',
+            'F#3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/Gb3.mp3',
+            'G3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/G3.mp3',
+            'G#3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/Ab3.mp3',
+            'A3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/A3.mp3',
+            'A#3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/Bb3.mp3',
+            'B3': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/B3.mp3',
+            'C4': 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/C4.mp3'
+        };
+
+        // --- iPad/モバイル対応: Web Audio APIの初期化 ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const decodedBuffers = {};
+
+        // 各音源ファイルを非同期（fetch）で取得してAudioBufferとしてデコード
+        Object.keys(soundUrls).forEach(note => {
+            fetch(soundUrls[note])
+                .then(response => response.arrayBuffer())
+                .then(arrayBuffer => audioCtx.decodeAudioData(arrayBuffer))
+                .then(decodedData => {
+                    decodedBuffers[note] = decodedData;
+                })
+                .catch(e => console.error("音声読み込みエラー:", e));
+        });
+
+        // 最初の画面タップでAudioContextをアンロック（iPad必須処理）
+        function unlockAudioContext() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // 音符マークのランダム生成
+        const symbols = ['♩', '♪', '♫', '♬'];
+        const notesStage = document.getElementById('notesStage');
+        const noteElementsList = [];
+
+        for (let i = 0; i < 13; i++) {
+            const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+            const item = document.createElement('div');
+            item.className = 'note-item';
+            item.textContent = randomSymbol;
+
+            const offsetY = (Math.random() * 40 - 20);
+            const rotation = (Math.random() * 40 - 20);
+
+            item.style.transform = `translateY(${offsetY}px) rotate(${rotation}deg)`;
+            item.style.setProperty('--rotation', `${rotation}deg`);
+
+            notesStage.appendChild(item);
+            noteElementsList.push(item);
+        }
+
+        // Web Audio APIを用いた高精度・遅延なしの再生処理
+        function playPianoAudio(note) {
+            const buffer = decodedBuffers[note];
+            if (!buffer) return;
+
+            const source = audioCtx.createBufferSource();
+            const gainNode = audioCtx.createGain();
+
+            source.buffer = buffer;
+            source.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+            gainNode.gain.setValueAtTime(1.0, now);
+            
+            // 0.8秒鳴らした後、0.2秒かけてスムーズにフェードアウト
+            gainNode.gain.setValueAtTime(1.0, now + 0.8);
+            gainNode.gain.linearRampToValueAtTime(0.01, now + 1.0);
+
+            source.start(now);
+            source.stop(now + 1.0);
+        }
+
+        function handleKeyPress(note) {
+            unlockAudioContext();
+            playPianoAudio(note);
+
+            const info = notesInfo.find(item => item.note === note);
+            const glowColor = info ? info.color : '#ffffff';
+
+            const randomIndex = Math.floor(Math.random() * noteElementsList.length);
+            const targetNoteElement = noteElementsList[randomIndex];
+
+            targetNoteElement.style.setProperty('--glow-color', glowColor);
+            targetNoteElement.classList.add('active');
+
+            setTimeout(() => {
+                targetNoteElement.classList.remove('active');
+            }, 350);
+        }
+
+        // イベントリスナーの登録
+        const keys = document.querySelectorAll('.key-white, .key-black');
+        keys.forEach(key => {
+            const note = key.getAttribute('data-note');
+
+            key.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                key.classList.add('pressed');
+                handleKeyPress(note);
+            });
+
+            key.addEventListener('pointerup', () => key.classList.remove('pressed'));
+            key.addEventListener('pointerleave', () => key.classList.remove('pressed'));
+            key.addEventListener('pointercancel', () => key.classList.remove('pressed'));
+        });
+    </script>
+</body>
+</html>
